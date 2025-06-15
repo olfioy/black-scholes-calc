@@ -2,6 +2,8 @@ import numpy as np
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objs as go
+import seaborn as sns
+import matplotlib.pyplot as plt
 from scipy.stats import norm
 
 # Core class for Black-Scholes Model
@@ -35,17 +37,6 @@ class BlackScholes:
         return {'Delta': delta, 'Gamma': gamma, 'Theta': theta, 'Vega': vega, 'Rho': rho}
 
 # Visualization of sensitivities and Greeks
-def generate_sensitivity_plot(param_name, param_values, S, K, T, r, sigma, option_type):
-    prices = []
-    for val in param_values:
-        kwargs = {'S': S, 'K': K, 'T': T, 'r': r, 'sigma': sigma}
-        kwargs[param_name] = val
-        model = BlackScholes(**kwargs)
-        prices.append(model.price(option_type))
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=param_values, y=prices, mode='lines', name='Option Price'))
-    fig.update_layout(title=f"{option_type} Price vs {param_name.capitalize()}", xaxis_title=param_name.capitalize(), yaxis_title='Option Price')
-    return fig
 
 def generate_greeks_plot(param_name, param_values, S, K, T, r, sigma, option_type):
     fig = go.Figure()
@@ -59,6 +50,22 @@ def generate_greeks_plot(param_name, param_values, S, K, T, r, sigma, option_typ
         fig.add_trace(go.Scatter(x=param_values, y=greek_values, mode='lines', name=greek))
     fig.update_layout(title=f"Greeks vs {param_name.capitalize()} ({option_type})", xaxis_title=param_name.capitalize(), yaxis_title='Value')
     return fig
+
+def generate_heatmap(param_name, S, K, T, r, sigma, option_type):
+    if param_name == 'S':
+        x_vals = np.linspace(50, 150, 20)
+        y_vals = np.linspace(0.1, 2.0, 20)
+        Z = np.zeros((len(x_vals), len(y_vals)))
+        for i, x in enumerate(x_vals):
+            for j, y in enumerate(y_vals):
+                model = BlackScholes(x, K, y, r, sigma)
+                Z[i, j] = model.price(option_type)
+        fig, ax = plt.subplots()
+        sns.heatmap(Z, xticklabels=np.round(y_vals, 2), yticklabels=np.round(x_vals, 2), ax=ax)
+        ax.set_xlabel("Time to Maturity (T)")
+        ax.set_ylabel("Spot Price (S)")
+        ax.set_title("Sensitivity Heatmap")
+        st.pyplot(fig)
 
 # Order Flow
 @st.cache_data
@@ -105,8 +112,25 @@ with tabs[0]:
             st.markdown(f"**{greek}:** {value:.4f}")
 
 with tabs[1]:
-    st.header("Sensitivity Analysis")
-    param = st.selectbox("Select Parameter to Vary", ["S", "K", "T", "r", "sigma"])
+    st.header("Sensitivity Analysis - Heatmap")
+    param_options = {
+        "Spot Price (S) vs Time to Maturity (T)": "S"
+    }
+    selected_param = st.selectbox("Select Heatmap Parameter", list(param_options.keys()))
+    param = param_options[selected_param]
+    generate_heatmap(param, S, K, T, r, sigma, option_type)
+
+with tabs[2]:
+    st.header("Greeks Visualization")
+    param_display = {
+        "Spot Price (S)": "S",
+        "Strike Price (K)": "K",
+        "Time to Maturity (T)": "T",
+        "Risk-Free Rate (r)": "r",
+        "Volatility (σ)": "sigma"
+    }
+    display_param = st.selectbox("Select Parameter to Vary for Greeks", list(param_display.keys()), key="greeks_param")
+    param = param_display[display_param]
     param_ranges = {
         "S": np.linspace(50, 150, 100),
         "K": np.linspace(50, 150, 100),
@@ -114,11 +138,6 @@ with tabs[1]:
         "r": np.linspace(0.0, 0.1, 100),
         "sigma": np.linspace(0.1, 0.6, 100)
     }
-    st.plotly_chart(generate_sensitivity_plot(param, param_ranges[param], S, K, T, r, sigma, option_type))
-
-with tabs[2]:
-    st.header("Greeks Visualization")
-    param = st.selectbox("Select Parameter to Vary for Greeks", ["S", "K", "T", "r", "sigma"], key="greeks_param")
     st.plotly_chart(generate_greeks_plot(param, param_ranges[param], S, K, T, r, sigma, option_type))
 
 with tabs[3]:
