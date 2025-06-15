@@ -77,28 +77,35 @@ def show_order_flow(ticker):
 st.set_page_config(page_title="Black-Scholes Analysis", layout="wide")
 st.title("\U0001F4C8 Black-Scholes Option Analysis Tool")
 
-col_left, col_right = st.columns(2)
-with col_left:
-    st.header("Define Parameters")
-    option_type = st.radio("Option Type", ["Call", "Put"])
-    S = st.slider("Stock Price (S)", 50.0, 200.0, 100.0)
-    K = st.slider("Strike Price (K)", 50.0, 200.0, 100.0)
-    T = st.slider("Time to Maturity (T in years)", 0.1, 2.0, 1.0)
-    r = st.slider("Risk-Free Rate (r)", 0.0, 0.1, 0.05)
-    sigma = st.slider("Volatility (σ)", 0.1, 0.6, 0.2)
+tabs = st.tabs(["Pricing & Greeks", "Sensitivity Analysis", "Greeks Visualization", "Broker Order Flow"])
 
-    model = BlackScholes(S, K, T, r, sigma)
-    st.subheader("Option Prices")
-    st.markdown(f"**Call Option Price:** {model.price('Call'):.2f}")
-    st.markdown(f"**Put Option Price:** {model.price('Put'):.2f}")
+with tabs[0]:
+    col_left, col_right = st.columns(2)
+    with col_left:
+        st.header("Define Parameters")
+        ticker = st.text_input("Stock Ticker (default is SPY)", value="SPY")
+        data = get_stock_data(ticker)
+        latest_price = data['Close'][-1]
+        S = st.number_input("Spot Price of Underlying", value=float(latest_price), step=1.0)
+        K = st.slider("Strike Price (K)", 50.0, 200.0, 100.0)
+        T = st.slider("Time to Maturity (T in years)", 0.1, 2.0, 1.0)
+        r = st.slider("Risk-Free Rate (r)", 0.0, 0.1, 0.05)
+        sigma = st.slider("Volatility (σ)", 0.1, 0.6, 0.2)
+        option_type = st.radio("Option Type", ["Call", "Put"])
 
-    st.subheader("Greeks Summary")
-    greeks = model.greeks(option_type)
-    for greek, value in greeks.items():
-        st.markdown(f"**{greek}:** {value:.4f}")
+    with col_right:
+        model = BlackScholes(S, K, T, r, sigma)
+        st.subheader("Option Prices")
+        st.markdown(f"**Call Option Price:** {model.price('Call'):.2f}")
+        st.markdown(f"**Put Option Price:** {model.price('Put'):.2f}")
 
-with col_right:
-    st.header("Visual Analysis")
+        st.subheader("Greeks Summary")
+        greeks = model.greeks(option_type)
+        for greek, value in greeks.items():
+            st.markdown(f"**{greek}:** {value:.4f}")
+
+with tabs[1]:
+    st.header("Sensitivity Analysis")
     param = st.selectbox("Select Parameter to Vary", ["S", "K", "T", "r", "sigma"])
     param_ranges = {
         "S": np.linspace(50, 150, 100),
@@ -108,9 +115,12 @@ with col_right:
         "sigma": np.linspace(0.1, 0.6, 100)
     }
     st.plotly_chart(generate_sensitivity_plot(param, param_ranges[param], S, K, T, r, sigma, option_type))
+
+with tabs[2]:
+    st.header("Greeks Visualization")
+    param = st.selectbox("Select Parameter to Vary for Greeks", ["S", "K", "T", "r", "sigma"], key="greeks_param")
     st.plotly_chart(generate_greeks_plot(param, param_ranges[param], S, K, T, r, sigma, option_type))
 
-st.divider()
-st.header("Broker Order Flow")
-ticker = st.text_input("Enter stock ticker (e.g., GOOG, MSFT, SPY)", value="SPY")
-st.plotly_chart(show_order_flow(ticker))
+with tabs[3]:
+    st.header("Broker Order Flow")
+    st.plotly_chart(show_order_flow(ticker))
